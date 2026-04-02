@@ -1,6 +1,10 @@
 # Abro
 
-Open-source terminal app built on Tauri + React, aimed at Warp-like UX with BYO LLM support.
+An open-source, modern terminal application built on Tauri + React. Abro brings a Warp-style block-based UI to your command line, with bring-your-own LLM support for inline AI assistance. Designed for developers who want a fast, extensible terminal with first-class agent integration — without vendor lock-in on the AI side.
+
+## Demo
+
+https://github.com/aeroxy/abro/raw/main/assets/demo.mp4
 
 ## Platform Target
 
