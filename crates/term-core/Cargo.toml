@@ -1,0 +1,15 @@
+[package]
+name = "term-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+dirs = "5"
+portable-pty = "0.9"
+serde.workspace = true
+shell-integration = { path = "../shell-integration" }
+thiserror.workspace = true
+vte = "0.15"
