@@ -1,3 +1,4 @@
+pub mod openrouter;
 pub mod vertex;
 
 use std::sync::mpsc;

@@ -6,7 +6,7 @@ use settings::config::{self, ConfigState};
 use terminal::{
     close_pty, get_completions, get_shell_history, resize_pty, spawn_pty, write_pty, PtyState,
 };
-use agent::ai_chat::{send_ai_message, continue_ai_with_tool_result, execute_tool_command, list_vertex_models};
+use agent::ai_chat::{send_ai_message, continue_ai_with_tool_result, execute_tool_command, list_vertex_models, list_openrouter_models};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -39,7 +39,8 @@ pub fn run() {
             send_ai_message,
             continue_ai_with_tool_result,
             execute_tool_command,
-            list_vertex_models
+            list_vertex_models,
+            list_openrouter_models
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

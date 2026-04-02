@@ -7,11 +7,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiProviderConfig {
     pub provider: String,
+    #[serde(default)]
     pub project_id: String,
+    #[serde(default)]
     pub location: String,
     pub model: String,
     #[serde(default)]
     pub credentials_path: Option<String>,
+    #[serde(default)]
+    pub api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

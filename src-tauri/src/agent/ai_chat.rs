@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
+use ai_gateway::openrouter::OpenRouterProvider;
 use ai_gateway::vertex::VertexProvider;
 use ai_gateway::{ChatProvider, CompletionRequest, StreamEvent, Content, Part, Tool, FunctionDeclaration, FunctionResponse};
 
@@ -42,6 +43,26 @@ pub struct ToolResult {
     pub exit_code: i32,
 }
 
+fn make_provider(
+    ai_config: &crate::settings::config::AiProviderConfig,
+) -> Result<Box<dyn ChatProvider>, String> {
+    match ai_config.provider.as_str() {
+        "openrouter" => {
+            let api_key = ai_config
+                .api_key
+                .clone()
+                .ok_or("OpenRouter API key not configured. Open Settings to add your key.")?;
+            Ok(Box::new(OpenRouterProvider::new(api_key, ai_config.model.clone())))
+        }
+        _ => Ok(Box::new(VertexProvider::new(
+            ai_config.project_id.clone(),
+            ai_config.location.clone(),
+            ai_config.model.clone(),
+            ai_config.credentials_path.clone(),
+        ))),
+    }
+}
+
 #[tauri::command]
 pub fn send_ai_message(
     app: AppHandle,
@@ -57,12 +78,7 @@ pub fn send_ai_message(
         .as_ref()
         .ok_or("AI is not configured. Open Settings to configure a provider.")?;
 
-    let provider = VertexProvider::new(
-        ai_config.project_id.clone(),
-        ai_config.location.clone(),
-        ai_config.model.clone(),
-        ai_config.credentials_path.clone(),
-    );
+    let provider = make_provider(ai_config)?;
 
     // Build contents from history
     let mut contents = if let Some(hist) = history {
@@ -204,12 +220,7 @@ pub fn continue_ai_with_tool_result(
         .as_ref()
         .ok_or("AI is not configured. Open Settings to configure a provider.")?;
 
-    let provider = VertexProvider::new(
-        ai_config.project_id.clone(),
-        ai_config.location.clone(),
-        ai_config.model.clone(),
-        ai_config.credentials_path.clone(),
-    );
+    let provider = make_provider(ai_config)?;
 
     // Build contents from history
     let mut contents = if let Some(hist) = history {
@@ -390,6 +401,12 @@ pub fn execute_tool_command(
         }),
         Err(e) => Err(format!("Failed to execute command: {}", e)),
     }
+}
+
+#[tauri::command]
+pub fn list_openrouter_models(api_key: String) -> Result<Vec<String>, String> {
+    let provider = OpenRouterProvider::new(api_key, String::new());
+    provider.list_models().map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -8,6 +8,7 @@ interface AiProviderConfig {
   location: string;
   model: string;
   credentials_path: string | null;
+  api_key: string | null;
 }
 
 interface AbroConfig {
@@ -24,6 +25,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [location, setLocation] = useState('asia-southeast1');
   const [model, setModel] = useState('gemini-2.5-flash');
   const [credentialsPath, setCredentialsPath] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -39,25 +41,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           setLocation(config.ai.location || 'asia-southeast1');
           setModel(config.ai.model || 'gemini-2.5-flash');
           setCredentialsPath(config.ai.credentials_path || '');
+          setApiKey(config.ai.api_key || '');
         }
       })
       .catch(console.error);
   }, []);
 
+  const handleProviderChange = (newProvider: string) => {
+    setProvider(newProvider);
+    setAvailableModels([]);
+    // Reset model to a sensible default for each provider
+    if (newProvider === 'openrouter') {
+      setModel('openai/gpt-4o-mini');
+    } else {
+      setModel('gemini-2.5-flash');
+    }
+  };
+
   const handleFetchModels = async () => {
-    if (!projectId.trim() || !location.trim()) {
-      setStatus('Error: Project ID and Location required');
-      return;
+    if (provider === 'openrouter') {
+      if (!apiKey.trim()) {
+        setStatus('Error: API key required');
+        return;
+      }
+    } else {
+      if (!projectId.trim() || !location.trim()) {
+        setStatus('Error: Project ID and Location required');
+        return;
+      }
     }
 
     setFetchingModels(true);
     setStatus(null);
     try {
-      const models = await invoke<string[]>('list_vertex_models', {
-        projectId,
-        location,
-        credentialsPath: credentialsPath || null,
-      });
+      const models = provider === 'openrouter'
+        ? await invoke<string[]>('list_openrouter_models', { apiKey })
+        : await invoke<string[]>('list_vertex_models', {
+            projectId,
+            location,
+            credentialsPath: credentialsPath || null,
+          });
       setAvailableModels(models);
       if (models.length > 0 && !model) {
         setModel(models[0]);
@@ -83,6 +106,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           location,
           model,
           credentials_path: credentialsPath || null,
+          api_key: apiKey || null,
         },
       };
       await invoke('save_config', { config });
@@ -94,6 +118,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       setSaving(false);
     }
   };
+
+  const isSaveDisabled =
+    saving ||
+    (provider === 'vertex' && !projectId.trim()) ||
+    (provider === 'openrouter' && !apiKey.trim());
+
+  const isOpenRouter = provider === 'openrouter';
 
   return (
     <div
@@ -137,44 +168,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             <label className="block text-xs text-[#8b949e] mb-1">Provider</label>
             <select
               value={provider}
-              onChange={(e) => setProvider(e.target.value)}
+              onChange={(e) => handleProviderChange(e.target.value)}
               className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm text-[#c9d1d9] focus:outline-none focus:ring-1 focus:ring-[#58a6ff]"
             >
               <option value="vertex">Vertex AI (Google)</option>
+              <option value="openrouter">OpenRouter</option>
             </select>
           </div>
 
-          {/* Project ID */}
-          <div>
-            <label className="block text-xs text-[#8b949e] mb-1">Project ID</label>
-            <input
-              type="text"
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              placeholder="my-gcp-project"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm font-mono text-[#c9d1d9] focus:outline-none focus:ring-1 focus:ring-[#58a6ff] placeholder:text-[#484f58]"
-            />
-          </div>
+          {/* OpenRouter: API Key */}
+          {isOpenRouter && (
+            <div>
+              <label className="block text-xs text-[#8b949e] mb-1">API Key</label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-or-..."
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm font-mono text-[#c9d1d9] focus:outline-none focus:ring-1 focus:ring-[#58a6ff] placeholder:text-[#484f58]"
+              />
+              <p className="mt-1 text-xs text-[#484f58]">Your OpenRouter API key from openrouter.ai/keys</p>
+            </div>
+          )}
 
-          {/* Location */}
-          <div>
-            <label className="block text-xs text-[#8b949e] mb-1">Location</label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="asia-southeast1"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm font-mono text-[#c9d1d9] focus:outline-none focus:ring-1 focus:ring-[#58a6ff] placeholder:text-[#484f58]"
-            />
-          </div>
+          {/* Vertex: Project ID */}
+          {!isOpenRouter && (
+            <div>
+              <label className="block text-xs text-[#8b949e] mb-1">Project ID</label>
+              <input
+                type="text"
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                placeholder="my-gcp-project"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm font-mono text-[#c9d1d9] focus:outline-none focus:ring-1 focus:ring-[#58a6ff] placeholder:text-[#484f58]"
+              />
+            </div>
+          )}
+
+          {/* Vertex: Location */}
+          {!isOpenRouter && (
+            <div>
+              <label className="block text-xs text-[#8b949e] mb-1">Location</label>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="asia-southeast1"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm font-mono text-[#c9d1d9] focus:outline-none focus:ring-1 focus:ring-[#58a6ff] placeholder:text-[#484f58]"
+              />
+            </div>
+          )}
 
           {/* Model */}
           <div>
@@ -183,7 +238,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               <button
                 type="button"
                 onClick={handleFetchModels}
-                disabled={fetchingModels || !projectId.trim() || !location.trim()}
+                disabled={
+                  fetchingModels ||
+                  (isOpenRouter ? !apiKey.trim() : !projectId.trim() || !location.trim())
+                }
                 className="flex items-center space-x-1 px-2 py-0.5 text-xs text-[#58a6ff] hover:text-[#79c0ff] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <RefreshCw className={`w-3 h-3 ${fetchingModels ? 'animate-spin' : ''}`} />
@@ -207,7 +265,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 type="text"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="gemini-2.5-flash"
+                placeholder={isOpenRouter ? 'openai/gpt-4o-mini' : 'gemini-2.5-flash'}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -217,22 +275,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             )}
           </div>
 
-          {/* Credentials Path */}
-          <div>
-            <label className="block text-xs text-[#8b949e] mb-1">Credentials File (optional)</label>
-            <input
-              type="text"
-              value={credentialsPath}
-              onChange={(e) => setCredentialsPath(e.target.value)}
-              placeholder="~/.config/gcloud/application_default_credentials.json"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm font-mono text-[#c9d1d9] focus:outline-none focus:ring-1 focus:ring-[#58a6ff] placeholder:text-[#484f58]"
-            />
-            <p className="mt-1 text-xs text-[#484f58]">Leave empty to use default gcloud credentials</p>
-          </div>
+          {/* Vertex: Credentials Path */}
+          {!isOpenRouter && (
+            <div>
+              <label className="block text-xs text-[#8b949e] mb-1">Credentials File (optional)</label>
+              <input
+                type="text"
+                value={credentialsPath}
+                onChange={(e) => setCredentialsPath(e.target.value)}
+                placeholder="~/.config/gcloud/application_default_credentials.json"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm font-mono text-[#c9d1d9] focus:outline-none focus:ring-1 focus:ring-[#58a6ff] placeholder:text-[#484f58]"
+              />
+              <p className="mt-1 text-xs text-[#484f58]">Leave empty to use default gcloud credentials</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -253,7 +313,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || !projectId.trim()}
+              disabled={isSaveDisabled}
               className="flex items-center space-x-1.5 px-3 py-1.5 text-sm text-white bg-[#238636] border border-[#2ea043] rounded-lg hover:bg-[#2ea043] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-3.5 h-3.5" />
