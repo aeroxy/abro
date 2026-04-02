@@ -1,6 +1,6 @@
 {
   "name": "abro",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Open-source terminal app built on tauri, aimed at Warp-like UX with BYO LLM support.",
   "scripts": {
     "dev": "vite",
